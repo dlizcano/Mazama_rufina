@@ -7,6 +7,9 @@ Hugo Mantilla
 
 ## Code and data for the article: Elevation as an occupancy determinant of the little red brocket deer (*Mazama rufina*) in the Central Andes of Colombia.
 
+[![DOI](https://zenodo.org/badge/331035705.svg)](https://zenodo.org/badge/latestdoi/331035705)
+
+
 ### load packages
 
 ``` r
