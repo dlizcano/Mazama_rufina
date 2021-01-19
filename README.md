@@ -1,7 +1,7 @@
 Elevation as an occupancy determinant of the little red brocket deer
 (*Mazama rufina*) in the Central Andes of Colombia
 ================
-Diego J. Lizcano, Silvia J. Alvarez, Vanessa Diaz, Diego R. Gutierrez,
+Diego J. Lizcano, Silvia J. Alvarez, Vanessa Diaz, Diego R. Gutierrez and
 Hugo Mantilla
 22/01/2020
 
@@ -29,10 +29,10 @@ library (rasterVis) # improve raster vis
 
 ``` r
 #read photo data in object y_full. Columns are days and rows sites
-load("D:/BoxFiles/Box Sync/CodigoR/Vanessa/data/y_full.RData")
+load("data/y_full.RData")
 
 # read camera location
-cams_loc_QR <- read.csv("D:/BoxFiles/Box Sync/CodigoR/Vanessa/data/cams_location.csv")
+cams_loc_QR <- read.csv("data/cams_location.csv")
 ```
 
 ### Initial Spatial Manipulation
