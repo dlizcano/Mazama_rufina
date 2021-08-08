@@ -5,7 +5,7 @@ Diego J. Lizcano, Silvia J. Alvarez, Vanessa Diaz, Diego R. Gutierrez and
 Hugo Mantilla
 22/01/2020
 
-## Code and data for the article: Elevation as an occupancy determinant of the little red brocket deer (*Mazama rufina*) in the Central Andes of Colombia. [![DOI](https://doi.org/10.15446/caldasia.v43n2.85449)](https://doi.org/10.15446/caldasia.v43n2.85449)
+## Code and data for the article: Elevation as an occupancy determinant of the little red brocket deer (*Mazama rufina*) in the Central Andes of Colombia. [https://doi.org/10.15446/caldasia.v43n2.85449](https://doi.org/10.15446/caldasia.v43n2.85449)
 
 [![DOI](https://zenodo.org/badge/331035705.svg)](https://zenodo.org/badge/latestdoi/331035705)
 
