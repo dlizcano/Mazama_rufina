@@ -1,0 +1,277 @@
+---
+title: "Elevation as an occupancy determinant of the little red brocket deer (_Mazama rufina_) in the Central Andes of Colombia"
+author: "Diego J. Lizcano, Silvia J. Alvarez, Vanessa Diaz, Diego R. Gutierrez, Hugo Mantilla"
+date: "22/01/2020"
+output:
+  rmarkdown::github_document
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.path = "README_figs/README-")
+```
+
+## Code and data for the article: Elevation as an occupancy determinant of the little red brocket deer (_Mazama rufina_) in the Central Andes of Colombia. 
+
+### load packages
+
+```{r packages, warning=FALSE, message=FALSE}
+library (raster) # raster
+library (sf) # vector maps
+library (unmarked) # Occupancy
+library (tidyverse) # data manipulation
+library (lubridate) # dates
+library (readxl) # read excel
+library (tmap) # nice maps
+library (tmaptools) # more maps
+library (osmdata) # read osm data
+library (OpenStreetMap) # osm maps 
+library (grid) # mix maps
+library (GADMTools) # subset GADM
+library (rasterVis) # improve raster vis
+```
+
+### Load data
+
+
+```{r warning=FALSE, message=FALSE}
+# read photo data in object y_full. Columns are days and rows sites
+load("D:/BoxFiles/Box Sync/CodigoR/Vanessa/data/y_full.RData")
+
+# read camera location
+cams_loc_QR <- read.csv("D:/BoxFiles/Box Sync/CodigoR/Vanessa/data/cams_location.csv")
+
+```
+
+### Initial Spatial Manipulation
+
+```{r warning=FALSE, message=FALSE}
+# convert to sf
+cams_loc_QR_sf <- st_as_sf(cams_loc_QR, coords = c("Longitud", "Latitud"), crs = "+proj=longlat +datum=WGS84 +no_defs")
+
+centroid <- c(mean(cams_loc_QR$Longitud), mean(cams_loc_QR$Latitud))
+clip_window <- extent(-75.60 , -75.39, 4.59, 4.81)
+bb <- c(-75.60, 4.59, -75.39,  4.81)
+
+# get spatial data
+srtm <- raster::getData('SRTM', lon=centroid[1], lat=centroid[2])
+
+# crop the  raster using the vector extent
+srtm_crop <- crop(srtm, clip_window)
+
+# elevation.crop and terrain covs
+elevation <- srtm_crop
+slope<-terrain(srtm_crop, opt="slope", unit='degrees', neighbors=8)
+aspect<-terrain(srtm_crop, opt="aspect", unit='degrees', neighbors=8)
+roughness <- terrain(srtm_crop, opt = c("roughness"))
+
+cov.stack<-stack(elevation, slope, aspect, roughness)
+names(cov.stack) <- c("elevation", "slope", "aspect", "roughness" )
+plot(cov.stack)
+
+# extract covariates
+cam_covs <- raster::extract(cov.stack, cams_loc_QR_sf)
+full_covs <- as.data.frame(cam_covs) # convert to Data frame
+full_covs_1 <- scale(full_covs)
+full_covs_s <- as.data.frame(full_covs_1)
+full_covs_s$camara <- cams_loc_QR$camara # add camera name
+```
+
+
+### Study area figure 1
+
+```{r warning=FALSE, message=FALSE}
+########## figure 1
+data_box <- st_as_sfc(st_bbox(cams_loc_QR_sf)) #bounding box
+
+# pal = mapviewPalette("mapviewTopoColors")
+# get fondo de osm
+andes_osm1 <- read_osm(bb, zoom = NULL, type="stamen-terrain", mergeTiles = TRUE) # type puede ser tambien bing, osm # type puede ser tambien bing, osm
+colombia <-  gadm_sf_loadCountries("COL", level=1, basefile="./")
+collimit <- gadm_sf_loadCountries("COL", level=0, basefile="./")
+
+deptos <- gadm_subset(colombia, regions=c("Risaralda", "Quindío"))
+
+
+depto_window <- qtm(andes_osm1)  + 
+  tm_shape(cams_loc_QR_sf) + 
+  tm_dots(col = "red", size = 0.2, 
+          shape = 16, title = "Sampling point", legend.show = TRUE,
+          legend.is.portrait = TRUE,
+          legend.z = NA) + 
+  tm_layout(scale = .9) +
+  # legend.position = c(.78,.72), 
+  # legend.outside.size = 0.1,
+  # legend.title.size = 1.6,
+  # legend.height = 0.9,
+  # legend.width = 1.5,
+  # legend.text.size = 1.2) + 
+  # legend.hist.size = 0.5) + 
+  tm_legend(position = c("left", "bottom"), frame = TRUE,
+            bg.color="white") + 
+  tm_layout(frame=F) + tm_scale_bar() + tm_compass(position = c(.75, .82), color.light = "grey90") 
+
+dep_map <-  tm_shape(deptos$sf) + tm_polygons() +
+  tm_shape(data_box) + tm_symbols(shape = 0, col = "red", size = 0.25)
+col_map <- tm_shape(collimit$sf) + tm_polygons() + tm_shape(deptos$sf) + tm_polygons()
+
+##### print all
+depto_window
+print(dep_map, vp = viewport(0.73, 0.40, width = 0.25, height = 0.25))
+print(col_map, vp = viewport(0.73, 0.65, width = 0.25, height = 0.25))
+
+
+```
+
+
+## Occupancy Analisys
+
+```{r warning=FALSE, message=FALSE}
+#############
+# Occu analisys
+
+# Make unmarked frame
+umf_y_full<- unmarkedFrameOccu(y= y_full[,1:108])
+siteCovs(umf_y_full) <- full_covs_s # data.frame(Elev=full_covs$Elev) # Full
+#######Graficar umf
+plot(umf_y_full)
+
+# build  models
+mf0<-occu(~1 ~ 1, umf_y_full)
+mf1<-occu(~1 ~ elevation, umf_y_full)
+mf2<-occu(~1 ~ elevation +I(elevation^2), umf_y_full)
+mf3<-occu(~1 ~ slope, umf_y_full)
+mf4<-occu(~1 ~ aspect, umf_y_full)
+mf5<-occu(~1 ~ roughness, umf_y_full, starts = c(0.6, -3, 0))
+mf6<-occu(~elevation +I(elevation^2) ~ elevation +I(elevation^2), umf_y_full)
+mf7<-occu(~roughness ~ elevation +I(elevation^2), umf_y_full)
+mf8<-occu(~slope ~ elevation +I(elevation^2), umf_y_full)
+
+
+# fit list
+fms1<-fitList("p(.) Ocu(.)"=mf0,
+              "p(.) Ocu(elev)"=mf1,
+              "p(.) Ocu(elev^2)"=mf2,
+              "p(.) Ocu(slope)"=mf3,
+              "p(.) Ocu(aspect)"=mf4,
+              "p(.) Ocu(roughness)"=mf5,
+              "p(elev^2) Ocu(elev^2)"=mf6,
+              "p(roughness) Ocu(elev^2)"=mf7,
+              "p(slope) Ocu(elev^2)"=mf8
+)
+
+
+modSel(fms1)
+
+# print(fms1)
+
+
+pb_f <- parboot(mf7, nsim=500, report=10) 
+plot (pb_f)
+
+
+newdat_range<-data.frame(elevation=seq(min(full_covs_s$elevation),
+                                       max(full_covs_s$elevation),length=100), 
+                         roughness=seq(min(full_covs_s$roughness),
+                                       max(full_covs_s$roughness), length=100))
+
+
+## plot Detection en escala estandarizada
+pred_det <-predict(mf7, type="det", newdata=newdat_range, appendData=TRUE)
+plot(Predicted~roughness, pred_det,type="l",col="blue", 
+     xlab="roughness",
+     ylab="Probabilidad de detección")
+lines(lower~roughness, pred_det,type="l",col=gray(0.5))
+lines(upper~roughness, pred_det,type="l",col=gray(0.5))
+
+### plot occupancy en escala estandarizada
+pred_psi <-predict(mf7, type="state", newdata=newdat_range, appendData=TRUE) 
+plot(Predicted~elevation, pred_psi,type="l",col="blue", ylim=c(0,0.95),
+     xlab="Altitud",
+     ylab="Probabilidad de ocupación")
+lines(lower~elevation, pred_psi,type="l",col=gray(0.5))
+lines(upper~elevation, pred_psi,type="l",col=gray(0.5))
+
+
+## plot Detection en escala original
+pred_det <-predict(mf7, type="det", newdata=newdat_range, appendData=TRUE)
+plot(Predicted~roughness, pred_det,type="l",col="blue", 
+     xlab="Roughness",
+     ylab="Detection Probability",
+     xaxt="n")
+xticks <- c(-1, -0.5, 0, 0.5, 1, 1.5, 2, 2.5, 3) # -1:2
+xlabs <- xticks*sd(full_covs$roughness) + mean(full_covs$roughness) #Use the mean and sd of original value to change label name
+axis(1, at=xticks, labels=round(xlabs, 1))
+lines(lower~roughness, pred_det,type="l",col=gray(0.5))
+lines(upper~roughness, pred_det,type="l",col=gray(0.5))
+
+
+###  Plot occupancy en escala original
+plot(Predicted ~ elevation, pred_psi, type="l", ylim=c(0,1), col="blue",
+     xlab="Elevation",
+     ylab="Occupancy Probability",
+     xaxt="n")
+xticks <- c(-1, -0.5, 0, 0.5, 1, 1.5, 2)  # -1:2
+xlabs <- xticks*sd(full_covs$elevation) + mean(full_covs$elevation) #Use the mean and sd of original value to change label name
+axis(1, at=xticks, labels=round(xlabs, 1))
+lines(lower ~ elevation, pred_psi, type="l", col=gray(0.5))
+lines(upper ~ elevation, pred_psi, type="l", col=gray(0.5))
+
+
+```
+
+### Spatially Explicit Detection Model.
+
+```{r, warning=FALSE, message=FALSE}
+library(RColorBrewer)
+
+srtm_crop_s <- stack(scale(elevation), 
+                     scale(roughness)) # scale altitud
+names(srtm_crop_s) <- c("elevation", "roughness")
+crs(srtm_crop_s) <- "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"
+
+pred_p_s <-predict(mf7, type="det", newdata=srtm_crop_s) 
+pred_p_r <- pred_p_s * sd(full_covs$roughness) + mean(full_covs$roughness)
+crs(pred_p_r) <- "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"
+clr <- colorRampPalette(brewer.pal(9, "YlGn"))
+
+#mapview (pred_p_r[[1]], col.regions = clr,  legend = TRUE, alpha=0.7)
+
+# plot(pred_psi_s[[1]], main="Detection", col = topo.colors(20))
+levelplot(pred_p_s[[1]], par.settings = YlOrRdTheme(), margin=FALSE, main="Detection")
+
+```
+
+### Spatially Explicit Occupancy Model.
+
+```{r warning=FALSE, message=FALSE}
+library(RColorBrewer)
+
+# srtm_crop_s <- stack(scale(elevation), 
+#                      scale(roughness)) # scale altitud
+# names(srtm_crop_s) <- c("elevation", "roughness")
+# crs(srtm_crop_s) <- "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"
+
+pred_psi_s <-predict(mf7, type="state", newdata=srtm_crop_s) 
+pred_psi_r <- pred_psi_s * sd(full_covs$elevation) + mean(full_covs$elevation)
+crs(pred_psi_r) <- "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"
+clr <- colorRampPalette(brewer.pal(9, "YlGn"))
+
+# mapview (pred_psi_r[[1]], col.regions = clr,  legend = TRUE, alpha=0.7)
+
+# plot(pred_psi_s[[1]], main="Occupancy")
+
+levelplot(pred_psi_r[[1]], par.settings = YlOrRdTheme(), margin=FALSE, main="Ocupancy")
+
+```
+
+
+## Session Info
+### Details and pakages used
+```{r sesion, message=FALSE, warning=FALSE, include=TRUE}
+print(sessionInfo(), locale = FALSE)
+```
+
+
+
+
