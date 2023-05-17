@@ -19,6 +19,7 @@ library (unmarked) # Occupancy
 library (tidyverse) # data manipulation
 library (lubridate) # dates
 library (readxl) # read excel
+library (readr) # read csv
 library (tmap) # nice maps
 library (tmaptools) # more maps
 library (osmdata) # read osm data
@@ -31,11 +32,16 @@ library (rasterVis) # improve raster vis
 ### Load data
 
 ``` r
-#read photo data in object y_full. Columns are days and rows sites
-load("data/y_full.RData")
+# read photo data in object y_full. Columns are days and rows sites
+# load("data/y_full.RData") # if you got the repo in hard disk
+ydata <- "https://github.com/dlizcano/Mazama_rufina/blob/main/data/y_full.RData?raw=true"
+load(url(ydata))
 
 # read camera location
-cams_loc_QR <- read.csv("data/cams_location.csv")
+# cams_loc_QR <- read.csv("data/cams_location.csv") # if you got the repo in hard disk
+camdata <- "https://raw.githubusercontent.com/dlizcano/Mazama_rufina/main/data/cams_location.csv"
+cams_loc_QR <- read_csv(url(camdata))
+
 ```
 
 ### Initial Spatial Manipulation
