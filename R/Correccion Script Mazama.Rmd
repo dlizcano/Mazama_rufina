@@ -1,0 +1,252 @@
+---
+title: "Mazana Rufina Github"
+author: "Victoria Isaza"
+date: "`15/03/2026`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Cargar paquetes
+
+```{r}
+library (raster) # raster
+library (sf) # vector maps
+library (unmarked) # Occupancy
+library (tidyverse) # data manipulation
+library (lubridate) # dates
+library (readxl) # read excel
+library (readr) # read csv
+library (tmap) # nice maps
+library (tmaptools) # more maps
+library (osmdata) # read osm data
+library (OpenStreetMap) # osm maps 
+library (grid) # mix maps
+library (rasterVis) # improve raster vis
+```
+## Cargar datos
+
+```{r}
+# read photo data in object y_full. Columns are days and rows sites
+# load("data/y_full.RData") # if you got the repo in hard disk
+ydata <- "https://github.com/dlizcano/Mazama_rufina/blob/main/data/y_full.RData?raw=true"
+load(url(ydata))
+
+# read camera location
+# cams_loc_QR <- read.csv("data/cams_location.csv") # if you got the repo in hard disk
+camdata <- "https://raw.githubusercontent.com/dlizcano/Mazama_rufina/main/data/cams_location.csv"
+cams_loc_QR <- read_csv(url(camdata))
+
+```
+## Manipulacion inicial de los datos espaciales
+
+```{r}
+# convert to sf
+cams_loc_QR_sf <- st_as_sf(cams_loc_QR, coords = c("Longitud", "Latitud"), crs = "+proj=longlat +datum=WGS84 +no_defs")
+
+centroid <- c(mean(cams_loc_QR$Longitud), mean(cams_loc_QR$Latitud))
+clip_window <- extent(-75.60 , -75.39, 4.59, 4.81)
+bb <- c(-75.60, 4.59, -75.39,  4.81)
+
+# get spatial data
+srtm <- geodata::elevation_30s(country = "COL", path = tempdir())
+
+# crop the  raster using the vector extent
+srtm_crop <- crop(srtm, clip_window)
+
+# elevation.crop and terrain covs
+elevation <- srtm_crop
+slope <- terra::terrain(srtm_crop, v="slope", unit="degrees")
+aspect <- terra::terrain(srtm_crop, v="aspect", unit="degrees")
+roughness <- terra::terrain(srtm_crop, v="roughness")
+
+cov.stack<-c(elevation, slope, aspect, roughness)
+names(cov.stack) <- c("elevation", "slope", "aspect", "roughness" )
+plot(cov.stack)
+```
+
+## Extraer covariantes
+
+```{r}
+## Extraer covariantes
+# extract covariates
+cam_covs <- terra::extract(cov.stack, cams_loc_QR_sf)
+
+full_covs <- as.data.frame(cam_covs)
+full_covs_1 <- scale(full_covs)
+full_covs_s <- as.data.frame(full_covs_1)
+
+full_covs_s$camara <- cams_loc_QR$camara
+
+
+############################
+# Area de estudio figura 1
+############################
+
+library(sf)
+library(tmap)
+library(maptiles)
+library(geodata)
+library(grid)
+
+# bounding box
+data_box <- st_bbox(cams_loc_QR_sf) |>
+  st_as_sfc() |>
+  st_sf()
+
+# mapa base OSM
+andes_osm1 <- get_tiles(
+  x = data_box,
+  provider = "OpenStreetMap",
+  crop = TRUE
+)
+
+# límites administrativos Colombia
+collimit <- geodata::gadm(country = "COL", level = 0, path = tempdir()) |>
+  st_as_sf()
+
+deptos <- geodata::gadm(country = "COL", level = 1, path = tempdir()) |>
+  st_as_sf()
+
+# seleccionar Risaralda y Quindío
+deptos_sel <- deptos[deptos$NAME_1 %in% c("Risaralda","Quindío"), ]
+
+############################
+# MAPA PRINCIPAL
+############################
+
+depto_window <- qtm(andes_osm1) +
+  
+  tm_shape(cams_loc_QR_sf) +
+  tm_dots(
+    col = "red",
+    size = 0.2,
+    shape = 16,
+    title = "Sampling point"
+  ) +
+  
+  tm_layout(scale = .9) +
+  
+  tm_legend(
+    position = c("left", "bottom"),
+    frame = TRUE,
+    bg.color = "white"
+  ) +
+  
+  tm_layout(frame = FALSE) +
+  
+  tm_scale_bar() +
+  
+  tm_compass(
+    position = c(.75, .82),
+    color.light = "grey90"
+  )
+
+
+############################
+# MAPA DEPARTAMENTOS (inset)
+############################
+
+dep_map <- tm_shape(deptos_sel) +
+  tm_polygons() +
+  
+  tm_shape(data_box) +
+  tm_borders(col = "red")
+
+
+############################
+# MAPA COLOMBIA (inset)
+############################
+
+col_map <- tm_shape(collimit) +
+  tm_polygons() +
+  
+  tm_shape(deptos_sel) +
+  tm_polygons(col = "grey50")
+
+
+############################
+# IMPRIMIR MAPAS
+############################
+
+depto_window
+
+grid.newpage()
+
+print(depto_window)
+
+print(
+  col_map,
+  vp = viewport(
+    x = 0.73,
+    y = 0.65,
+    width = 0.25,
+    height = 0.25
+  )
+)
+
+print(
+  dep_map,
+  vp = viewport(
+    x = 0.73,
+    y = 0.40,
+    width = 0.25,
+    height = 0.25
+  )
+)
+```
+
+# Analisis de ocupacion
+
+```{r}
+#############
+# Occu analisys
+
+# Make unmarked frame
+umf_y_full<- unmarkedFrameOccu(y= y_full[,1:108])
+siteCovs(umf_y_full) <- full_covs_s # data.frame(Elev=full_covs$Elev) # Full
+#######Graficar umf
+plot(umf_y_full)
+```
+
+## Construir modelos
+
+```{r}
+# build  models
+mf0<-occu(~1 ~ 1, umf_y_full)
+mf1<-occu(~1 ~ elevation, umf_y_full)
+mf2<-occu(~1 ~ elevation +I(elevation^2), umf_y_full)
+mf3<-occu(~1 ~ slope, umf_y_full)
+mf4<-occu(~1 ~ aspect, umf_y_full)
+mf5<-occu(~1 ~ roughness, umf_y_full, starts = c(0.6, -3, 0))
+mf6<-occu(~elevation +I(elevation^2) ~ elevation +I(elevation^2), umf_y_full)
+mf7<-occu(~roughness ~ elevation +I(elevation^2), umf_y_full)
+mf8<-occu(~slope ~ elevation +I(elevation^2), umf_y_full)
+
+
+# fit list
+fms1<-fitList("p(.) Ocu(.)"=mf0,
+              "p(.) Ocu(elev)"=mf1,
+              "p(.) Ocu(elev^2)"=mf2,
+              "p(.) Ocu(slope)"=mf3,
+              "p(.) Ocu(aspect)"=mf4,
+              "p(.) Ocu(roughness)"=mf5,
+              "p(elev^2) Ocu(elev^2)"=mf6,
+              "p(roughness) Ocu(elev^2)"=mf7,
+              "p(slope) Ocu(elev^2)"=mf8
+)
+
+
+modSel(fms1)
+```
+```{r}
+# print(fms1)
+
+
+pb_f <- parboot(mf7, nsim=500, report=10)
+
+plot (pb_f)
+```
+
