@@ -9,6 +9,7 @@ Hugo Mantilla
 
 [![DOI](https://zenodo.org/badge/331035705.svg)](https://zenodo.org/badge/latestdoi/331035705)
 
+## Edited version to run in 2026 by https://github.com/victoriaisazagamboa372-col ahttps://github.com/dlizcano/Mazama_rufina/commits?author=victoriaisazagamboa372-col
 
 ### load packages
 
@@ -55,20 +56,21 @@ clip_window <- extent(-75.60 , -75.39, 4.59, 4.81)
 bb <- c(-75.60, 4.59, -75.39,  4.81)
 
 # get spatial data
-srtm <- raster::getData('SRTM', lon=centroid[1], lat=centroid[2])
+srtm <- geodata::elevation_30s(country = "COL", path = tempdir())
 
 # crop the  raster using the vector extent
 srtm_crop <- crop(srtm, clip_window)
 
 # elevation.crop and terrain covs
 elevation <- srtm_crop
-slope<-terrain(srtm_crop, opt="slope", unit='degrees', neighbors=8)
-aspect<-terrain(srtm_crop, opt="aspect", unit='degrees', neighbors=8)
-roughness <- terrain(srtm_crop, opt = c("roughness"))
+slope <- terra::terrain(srtm_crop, v="slope", unit="degrees")
+aspect <- terra::terrain(srtm_crop, v="aspect", unit="degrees")
+roughness <- terra::terrain(srtm_crop, v="roughness")
 
-cov.stack<-stack(elevation, slope, aspect, roughness)
+cov.stack<-c(elevation, slope, aspect, roughness)
 names(cov.stack) <- c("elevation", "slope", "aspect", "roughness" )
 plot(cov.stack)
+
 ```
 
 ![](figs/README-unnamed-chunk-2-1.png)<!-- -->
@@ -85,49 +87,139 @@ full_covs_s$camara <- cams_loc_QR$camara # add camera name
 ### Study area figure 1
 
 ``` r
-########## figure 1
-data_box <- st_as_sfc(st_bbox(cams_loc_QR_sf)) #bounding box
 
-# pal = mapviewPalette("mapviewTopoColors")
-# get fondo de osm
-andes_osm1 <- read_osm(bb, zoom = NULL, type="stamen-terrain", mergeTiles = TRUE) # type puede ser tambien bing, osm # type puede ser tambien bing, osm
-colombia <-  gadm_sf_loadCountries("COL", level=1, basefile="./")
-collimit <- gadm_sf_loadCountries("COL", level=0, basefile="./")
+## Extraer covariantes
+# extract covariates
+cam_covs <- terra::extract(cov.stack, cams_loc_QR_sf)
 
-deptos <- gadm_subset(colombia, regions=c("Risaralda", "Quindío"))
+full_covs <- as.data.frame(cam_covs)
+full_covs_1 <- scale(full_covs)
+full_covs_s <- as.data.frame(full_covs_1)
+
+full_covs_s$camara <- cams_loc_QR$camara
 
 
-depto_window <- qtm(andes_osm1)  + 
-  tm_shape(cams_loc_QR_sf) + 
-  tm_dots(col = "red", size = 0.2, 
-          shape = 16, title = "Sampling point", legend.show = TRUE,
-          legend.is.portrait = TRUE,
-          legend.z = NA) + 
+############################
+# Area de estudio figura 1
+############################
+
+library(sf)
+library(tmap)
+library(maptiles)
+library(geodata)
+library(grid)
+
+# bounding box
+data_box <- st_bbox(cams_loc_QR_sf) |>
+  st_as_sfc() |>
+  st_sf()
+
+# mapa base OSM
+andes_osm1 <- get_tiles(
+  x = data_box,
+  provider = "OpenStreetMap",
+  crop = TRUE
+)
+
+# límites administrativos Colombia
+collimit <- geodata::gadm(country = "COL", level = 0, path = tempdir()) |>
+  st_as_sf()
+
+deptos <- geodata::gadm(country = "COL", level = 1, path = tempdir()) |>
+  st_as_sf()
+
+# seleccionar Risaralda y Quindío
+deptos_sel <- deptos[deptos$NAME_1 %in% c("Risaralda","Quindío"), ]
+
+############################
+# MAPA PRINCIPAL
+############################
+
+depto_window <- qtm(andes_osm1) +
+  
+  tm_shape(cams_loc_QR_sf) +
+  tm_dots(
+    col = "red",
+    size = 0.2,
+    shape = 16,
+    title = "Sampling point"
+  ) +
+  
   tm_layout(scale = .9) +
-  # legend.position = c(.78,.72), 
-  # legend.outside.size = 0.1,
-  # legend.title.size = 1.6,
-  # legend.height = 0.9,
-  # legend.width = 1.5,
-  # legend.text.size = 1.2) + 
-  # legend.hist.size = 0.5) + 
-  tm_legend(position = c("left", "bottom"), frame = TRUE,
-            bg.color="white") + 
-  tm_layout(frame=F) + tm_scale_bar() + tm_compass(position = c(.75, .82), color.light = "grey90") 
+  
+  tm_legend(
+    position = c("left", "bottom"),
+    frame = TRUE,
+    bg.color = "white"
+  ) +
+  
+  tm_layout(frame = FALSE) +
+  
+  tm_scale_bar() +
+  
+  tm_compass(
+    position = c(.75, .82),
+    color.light = "grey90"
+  )
 
-dep_map <-  tm_shape(deptos$sf) + tm_polygons() +
-  tm_shape(data_box) + tm_symbols(shape = 0, col = "red", size = 0.25)
-col_map <- tm_shape(collimit$sf) + tm_polygons() + tm_shape(deptos$sf) + tm_polygons()
 
-##### print all
+############################
+# MAPA DEPARTAMENTOS (inset)
+############################
+
+dep_map <- tm_shape(deptos_sel) +
+  tm_polygons() +
+  
+  tm_shape(data_box) +
+  tm_borders(col = "red")
+
+
+############################
+# MAPA COLOMBIA (inset)
+############################
+
+col_map <- tm_shape(collimit) +
+  tm_polygons() +
+  
+  tm_shape(deptos_sel) +
+  tm_polygons(col = "grey50")
+
+
+############################
+# IMPRIMIR MAPAS
+############################
+
 depto_window
-print(dep_map, vp = viewport(0.73, 0.40, width = 0.25, height = 0.25))
-print(col_map, vp = viewport(0.73, 0.65, width = 0.25, height = 0.25))
+
+grid.newpage()
+
+print(depto_window)
+
+print(
+  col_map,
+  vp = viewport(
+    x = 0.73,
+    y = 0.65,
+    width = 0.25,
+    height = 0.25
+  )
+)
+
+print(
+  dep_map,
+  vp = viewport(
+    x = 0.73,
+    y = 0.40,
+    width = 0.25,
+    height = 0.25
+  )
+)
+
 ```
 
 ![](figs/README-unnamed-chunk-3-1.png)<!-- -->
 
-## Occupancy Analisys
+## Occupancy Analysis
 
 ``` r
 #############
