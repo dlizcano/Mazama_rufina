@@ -52,7 +52,7 @@ cams_loc_QR <- read_csv(url(camdata))
 cams_loc_QR_sf <- st_as_sf(cams_loc_QR, coords = c("Longitud", "Latitud"), crs = "+proj=longlat +datum=WGS84 +no_defs")
 
 centroid <- c(mean(cams_loc_QR$Longitud), mean(cams_loc_QR$Latitud))
-clip_window <- extent(-75.60 , -75.39, 4.59, 4.81)
+clip_window <- ext(-75.60 , -75.39, 4.59, 4.81)
 bb <- c(-75.60, 4.59, -75.39,  4.81)
 
 # get spatial data
