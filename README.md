@@ -56,7 +56,9 @@ clip_window <- extent(-75.60 , -75.39, 4.59, 4.81)
 bb <- c(-75.60, 4.59, -75.39,  4.81)
 
 # get spatial data
-srtm <- geodata::elevation_30s(country = "COL", path = tempdir())
+srtm <- geodata::elevation_3s(lon=centroid[1], 
+                              lat=centroid[2], 
+                              path = tempdir())
 
 # crop the  raster using the vector extent
 srtm_crop <- crop(srtm, clip_window)
