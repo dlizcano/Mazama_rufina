@@ -79,7 +79,7 @@ plot(cov.stack)
 
 ``` r
 # extract covariates
-cam_covs <- raster::extract(cov.stack, cams_loc_QR_sf)
+cam_covs <- terra::extract(cov.stack, cams_loc_QR_sf)
 full_covs <- as.data.frame(cam_covs) # convert to Data frame
 full_covs_1 <- scale(full_covs)
 full_covs_s <- as.data.frame(full_covs_1)
@@ -92,13 +92,11 @@ full_covs_s$camara <- cams_loc_QR$camara # add camera name
 
 ## Extraer covariantes
 # extract covariates
-cam_covs <- terra::extract(cov.stack, cams_loc_QR_sf)
-
-full_covs <- as.data.frame(cam_covs)
-full_covs_1 <- scale(full_covs)
-full_covs_s <- as.data.frame(full_covs_1)
-
-full_covs_s$camara <- cams_loc_QR$camara
+# cam_covs <- terra::extract(cov.stack, cams_loc_QR_sf)
+# full_covs <- as.data.frame(cam_covs)
+# full_covs_1 <- scale(full_covs)
+# full_covs_s <- as.data.frame(full_covs_1)
+# full_covs_s$camara <- cams_loc_QR$camara
 
 
 ############################
