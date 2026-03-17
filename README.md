@@ -14,7 +14,7 @@ Hugo Mantilla
 ### load packages
 
 ``` r
-library (raster) # raster
+# library (raster) # raster # replaced by terra
 library (sf) # vector maps
 library (unmarked) # Occupancy
 library (tidyverse) # data manipulation
