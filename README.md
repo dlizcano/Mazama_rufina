@@ -26,7 +26,7 @@ library (tmaptools) # more maps
 library (osmdata) # read osm data
 library (OpenStreetMap) # osm maps 
 library (grid) # mix maps
-library (GADMTools) # subset GADM
+# library (GADMTools) # subset GADM # deprecated 
 library (rasterVis) # improve raster vis
 ```
 
